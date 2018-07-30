@@ -11,6 +11,7 @@ import tensorflow as tf
 from simple_cnn.text_cnn import TextCNN
 import os
 import datetime
+from sklearn.metrics import accuracy_score
 
 
 # params
@@ -28,7 +29,7 @@ tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularization lambda (default: 
 
 # training params
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
-tf.flags.DEFINE_integer("num_epochs", 10, "Number of training epochs (default: 200)")
+tf.flags.DEFINE_integer("num_epochs", 20, "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("evaluate_every", 100, "Evaluate model on dev set after this many steps (default: 100)")
 tf.flags.DEFINE_integer("checkpoint_every", 100, "Save model after this many steps (default: 100)")
 tf.flags.DEFINE_integer("num_checkpoints", 5, "Number of checkpoints to store (default: 5)")
@@ -39,6 +40,18 @@ tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on 
 
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
+
+
+def score(pred, label):
+    """
+    compute the pre
+    :param pred:
+    :param label:
+    :return:
+    """
+    label = np.argmax(label, axis=1).tolist()
+    acc = accuracy_score(pred, label)
+    return acc
 
 
 def preprocess():
@@ -142,41 +155,38 @@ def train(x_train, y_train, vocab_processor, x_dev, y_dev):
                 """
                 Something wrong happened so we should use batch
                 """
-                num = 20
+                batch_num = 20
                 x_batch = x_batch.tolist()
                 y_batch = y_batch.tolist()
                 l = len(y_batch)
-                l_20 = int(l / num)
+                l_20 = int(l / batch_num)
                 x_set = []
                 y_set = []
-                for i in range(num - 1):
+                for i in range(batch_num - 1):
                     x_temp = x_batch[i * l_20:(i + 1) * l_20]
                     x_set.append(x_temp)
                     y_temp = y_batch[i * l_20:(i + 1) * l_20]
                     y_set.append(y_temp)
-                x_temp = x_batch[(num - 1) * l_20:]
+                x_temp = x_batch[(batch_num - 1) * l_20:]
                 x_set.append(x_temp)
-                y_temp = y_batch[(num - 1) * l_20:]
+                y_temp = y_batch[(batch_num - 1) * l_20:]
                 y_set.append(y_temp)
 
-                # each batch computation and then add up
-                lis_loss = []
-                lis_acc = []
-                for i in range(num):
+                # get the whole predictions and then compute accuracy
+                lis_predictions = []
+                lis_labels = []
+                for i in range(batch_num):
                     feed_dict = {
                         cnn.input_x: np.array(x_set[i]),
-                        cnn.input_y: np.array(y_set[i]),
                         cnn.dropout_keep_prob: 1.0
                     }
-                    step, loss, accuracy = sess.run(
-                        [global_step, cnn.loss, cnn.accuracy],
+                    step, predictions = sess.run(
+                        [global_step, cnn.predictions],
                         feed_dict=feed_dict
                     )
-                    lis_loss.append(loss)
-                    lis_acc.append(accuracy)
-                    time_str = datetime.datetime.now().isoformat()
-                    print("{}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
-                print("test_loss and test_acc" + "\t\t" + str(sum(lis_loss) / num) + "\t\t" + str(sum(lis_acc) / num))
+                    lis_predictions.extend(predictions)  # Attention! Don't use append
+                    lis_labels.extend(y_set[i])
+                print("test_acc" + "\t\t" + str(score(lis_predictions, lis_labels)))
 
             # generate batches
             batches = data_process.batch_iter(
