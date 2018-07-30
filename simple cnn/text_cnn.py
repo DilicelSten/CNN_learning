@@ -18,9 +18,9 @@ class TextCNN(object):
       embedding_size, filter_sizes, num_filters, l2_reg_lambda=0.0):
 
         # Placeholders for input, output and dropout
-        self.input_x = tf.placeholder(tf.int32, [None, sequence_length], name="inpit_x")
+        self.input_x = tf.placeholder(tf.int32, [None, sequence_length], name="input_x")
         self.input_y = tf.placeholder(tf.float32, [None, num_classes], name="input_y")
-        self.dropout_keep_prob = tf.placeholder(tf.float32, name="fropout_keep_prob")
+        self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
 
         # keeping track of l2 regularization loss (optional)
         l2_loss = tf.constant(0.0)
@@ -28,7 +28,7 @@ class TextCNN(object):
         # Embedding layer
         with tf.device('/cpu:0'), tf.name_scope("embedding"):
             self.W = tf.Variable(
-                tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0),
+                tf.random_uniform([vocab_size, embedding_size], -0.25, 0.25),
                 name="W")
             self.embedded_chars = tf.nn.embedding_lookup(self.W, self.input_x)
             self.embedded_chars_expanded = tf.expand_dims(self.embedded_chars, -1)
@@ -47,9 +47,11 @@ class TextCNN(object):
                     strides=[1, 1, 1, 1],
                     padding="VALID",
                     name="conv")
+
                 # apply nonlinearity
                 h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu")
-                # maxpoolong over the outputs
+
+                # maxpooling over the outputs
                 pooled = tf.nn.max_pool(
                     h,
                     ksize=[1, sequence_length - filter_size + 1, 1, 1],
@@ -72,7 +74,7 @@ class TextCNN(object):
             W = tf.get_variable(
                 "W",
                 shape=[num_filters_total, num_classes],
-                initializer=tf.contrib.layers.xavier_initializer())  # something wrong
+                initializer=tf.contrib.layers.xavier_initializer())
             b = tf.Variable(tf.constant(0.1, shape=[num_classes]), name="b")
             l2_loss += tf.nn.l2_loss(W)
             l2_loss += tf.nn.l2_loss(b)
